@@ -1,7 +1,7 @@
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.awt.*;
@@ -12,10 +12,14 @@ import java.util.List;
 
 public class SlowAnchor extends ListenerAdapter {
 
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
 
         String[] args = event.getMessage().getContentRaw().split("\\s+");
-        //Member stickyBot = event.getGuild().getMemberById(Main.botId);
+        //Member anchorBot = event.getGuild().getMemberById(Main.botId);
         String channelId = event.getChannel().getId();
 
         String prefix = "?";
@@ -33,10 +37,10 @@ public class SlowAnchor extends ListenerAdapter {
                 EmbedBuilder em = new EmbedBuilder();
                 em.setTitle("**Whoops! This is an AnchorBot Command!** ")
                         .addField("__AnchorBot__ allows for slow pins plus other features.", "This command is available to all servers.", false);
-                event.getMessage().reply(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
             } else {
                 try {
-                    //remove last sticky message if there is one (user used sticky command while already having one)
+                    //remove last pin message if there is one (user used pin command while already having one)
 
                 if(Main.mapMessage.containsKey(event.getChannel().getId())) {
                         Main.mapMessage.remove(channelId);
@@ -52,14 +56,6 @@ public class SlowAnchor extends ListenerAdapter {
                     }
 
 
-                        for (Emote emote : event.getMessage().getEmotes()) {
-                            event.getGuild().retrieveEmoteById(emote.getId()).queue(success -> {}, failure -> {
-                                event.getMessage().reply(event.getMember().getAsMention() + " Error: Please only use emotes that are from this server.").queue();
-                                Main.mapMessageSlow.remove(event.getChannel().getId());
-                                removeDB(channelId);
-                            });
-                        }
-
                         String input = event.getMessage().getContentRaw();
 
                         if (event.getMessage().getContentRaw().contains(prefix + "stickslow \n")) {
@@ -69,12 +65,12 @@ public class SlowAnchor extends ListenerAdapter {
 
 
                         String [] arr = input.split(" ", 2);
-                        Main.mapMessageSlow.put(event.getChannel().getId(), arr[1]);
+                        Main.mapMessageSlow.put(event.getChannel().getId(), BotUtil.stripCustomEmoji(arr[1].trim()));
                         removeDB(channelId);
-                        addDB(channelId,(arr[1]));
+                        addDB(channelId, Main.mapMessageSlow.get(channelId));
 
                     SilentMessages.send(event.getChannel(), Main.mapMessageSlow.get(channelId)).queue(m -> Main.mapDeleteId2.put(event.getChannel().getId(), m.getId()));
-                    event.getMessage().addReaction("\u2705").queue();
+                    BotUtil.react(event.getMessage(), "✅");
                 } catch (Exception e) {
                     event.getMessage().reply(event.getMember().getAsMention() + " please use this format: `" + prefix + "stickslow <message>`.").queue();
                 }
@@ -83,7 +79,7 @@ public class SlowAnchor extends ListenerAdapter {
 
         } else if (args[0].equalsIgnoreCase(prefix + "stickslow") && (!permCheck(event.getMember() ))) {
             //Adds X emote
-            event.getMessage().addReaction("\u274C").queue();
+            BotUtil.react(event.getMessage(), "❌");
             //event.getChannel().sendMessage(event.getMember().getAsMention() + " you need the global `Manage Messages` permission to use this command!").queue();
         }
 
@@ -95,10 +91,10 @@ public class SlowAnchor extends ListenerAdapter {
             }
 
             removeDB(channelId);
-            event.getMessage().addReaction("\u2705").queue();
-        } else if ( (args[0].equalsIgnoreCase(Main.prefix + "stickstop") || args[0].equalsIgnoreCase(Main.prefix + "unstick")) && (!permCheck(event.getMember() ))) {
+            BotUtil.react(event.getMessage(), "✅");
+        } else if ( (args[0].equalsIgnoreCase(prefix + "stickstop") || args[0].equalsIgnoreCase(prefix + "unstick")) && (!permCheck(event.getMember() ))) {
             //Adds X mark
-            event.getMessage().addReaction("\u274C").queue();
+            BotUtil.react(event.getMessage(), "❌");
             //event.getChannel().sendMessage(event.getMember().getAsMention() + " you need the global `Manage Messages` permission to use this command!").queue();
         }
 
@@ -107,7 +103,7 @@ public class SlowAnchor extends ListenerAdapter {
             event.getChannel().getHistory().retrievePast(18).queue(history -> {
                 try {
                     for(Message m : history.subList(0, 13)) {
-                        //if message is sticky message
+                        //if message is pin message
                         if(m.getContentRaw().equals(Main.mapMessageSlow.get(channelId))) {
                             //if message is older then 35 sec
                             if(m.getTimeCreated().compareTo(OffsetDateTime.now().minusSeconds(35)) < 0) {
@@ -121,7 +117,7 @@ public class SlowAnchor extends ListenerAdapter {
                     //do nothing
                 }
 
-                //gets set to true if one of last five messages contains sticky message.
+                //gets set to true if one of last five messages contains pin message.
                 Boolean check = false;
 
                 try {
@@ -149,7 +145,7 @@ public class SlowAnchor extends ListenerAdapter {
                     }
                 }
 
-                //Added to make sure it does not bug and send two stickies (next 5 lines)
+                //Added to make sure it does not bug and send two pins (next 5 lines)
                 List<Message> indexes = new ArrayList<>();
 
                 for (Message mes : history) {
@@ -186,3 +182,4 @@ public class SlowAnchor extends ListenerAdapter {
 
 
 }
+

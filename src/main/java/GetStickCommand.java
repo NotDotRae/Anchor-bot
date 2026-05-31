@@ -1,7 +1,7 @@
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.awt.*;
@@ -10,7 +10,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class GetStickCommand extends ListenerAdapter {
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
         String[] args = event.getMessage().getContentRaw().split("\\s+");
         String prefix = "?";
         String guildID = event.getGuild().getId();
@@ -32,40 +36,40 @@ public class GetStickCommand extends ListenerAdapter {
                 return;
             }
 
-            if (getClassicStickyChannels(guildID).isEmpty() && getSlowAnchorChannels(guildID).isEmpty() && getEmbedStickyChannels(guildID).isEmpty() && getWebhookStickyChannels(guildID).isEmpty()) {
+            if (getClassicPinChannels(guildID).isEmpty() && getSlowAnchorChannels(guildID).isEmpty() && getEmbedPinChannels(guildID).isEmpty() && getWebhookPinChannels(guildID).isEmpty()) {
                 event.getMessage().reply("No active pins in this server!\nYou can make one with `" + prefix + "stick` or use `" + prefix + "help` for a full list of commands.").queue();
                 return;
             }
 
-            Member stickyBot = event.getGuild().getMemberById(Main.botId);
+            Member anchorBot = event.getGuild().getMemberById(Main.botId);
             EmbedBuilder emb = new EmbedBuilder();
-            emb.setColor(Color.ORANGE)
+            emb.setColor(BotStyle.PRIMARY)
                     .setTitle("-Active Pins in **" + event.getGuild().getName() + "**-")
-                    .setFooter("AnchorBot", Main.jda.getShards().get(0).getSelfUser().getAvatarUrl());
+                    .setFooter("AnchorBot", BotUtil.botAvatarUrl());
 
 
-            if (!getClassicStickyChannels(guildID).isEmpty()) {
+            if (!getClassicPinChannels(guildID).isEmpty()) {
                 //Add classic stickies to embed
-                for (String channelID : getClassicStickyChannels(guildID)) {
-                    emb.addField("Classic Pin:", "Channel: " + event.getGuild().getGuildChannelById(channelID).getAsMention() + "\n__Pinned Message:__```\n" + Main.mapMessage.get(channelID) + "```", false);
+                for (String channelID : getClassicPinChannels(guildID)) {
+                    emb.addField("Classic Pin:", "Channel: " + BotUtil.channelMention(event.getGuild(), channelID) + "\n__Pinned Message:__```\n" + Main.mapMessage.get(channelID) + "```", false);
                 }
             }
             if (!getSlowAnchorChannels(guildID).isEmpty()) {
-                //Add Sticky Slow to embed
+                //Add Slow Pin to embed
                 for (String channelID : getSlowAnchorChannels(guildID)) {
-                    emb.addField("Slow Pin:", "Channel: " + event.getGuild().getGuildChannelById(channelID).getAsMention() + "\n__Pinned Message:__```\n" + Main.mapMessageSlow.get(channelID) + "```", false);
+                    emb.addField("Slow Pin:", "Channel: " + BotUtil.channelMention(event.getGuild(), channelID) + "\n__Pinned Message:__```\n" + Main.mapMessageSlow.get(channelID) + "```", false);
                 }
             }
-            if (!getEmbedStickyChannels(guildID).isEmpty()) {
+            if (!getEmbedPinChannels(guildID).isEmpty()) {
                 //Add pin embeds to embed
-                for (String channelID : getEmbedStickyChannels(guildID)) {
-                    emb.addField("Pin Embed:", "Channel: " + event.getGuild().getGuildChannelById(channelID).getAsMention() + "__\nPinned Message:__```\n" + Main.mapMessageEmbed.get(channelID) + "```", false);
+                for (String channelID : getEmbedPinChannels(guildID)) {
+                    emb.addField("Pin Embed:", "Channel: " + BotUtil.channelMention(event.getGuild(), channelID) + "__\nPinned Message:__```\n" + Main.mapMessageEmbed.get(channelID) + "```", false);
                 }
             }
-            if (!getWebhookStickyChannels(guildID).isEmpty()) {
+            if (!getWebhookPinChannels(guildID).isEmpty()) {
                 //Add pin WebHook to embed
-                for (String channelID : getEmbedStickyChannels(guildID)) {
-                    emb.addField("WebHook Pin Embed:", "Channel: " + event.getGuild().getGuildChannelById(channelID).getAsMention() + "__\nPinned Message:__```\n" + Main.webhookMessage.get(channelID) + "```", false);
+                for (String channelID : getWebhookPinChannels(guildID)) {
+                    emb.addField("WebHook Pin Embed:", "Channel: " + BotUtil.channelMention(event.getGuild(), channelID) + "__\nPinned Message:__```\n" + Main.webhookMessage.get(channelID) + "```", false);
                 }
             }
 
@@ -75,48 +79,21 @@ public class GetStickCommand extends ListenerAdapter {
     }
 
 
-    public List<String> getClassicStickyChannels(String guildId) {
-        List<String> channelIds = Main.jda.getGuildById(guildId).getTextChannels().stream().map(textChannel -> textChannel.getId()).collect(Collectors.toList());
-        List<String> stickyChannelIDs = new ArrayList<>();
-        for (String id : channelIds) {
-            if (Main.mapMessage.containsKey(id)) {
-                stickyChannelIDs.add(id);
-            }
-        }
-        return stickyChannelIDs;
+    public List<String> getClassicPinChannels(String guildId) {
+        return BotUtil.activeChannelIds(Main.jda.getGuildById(guildId), Main.mapMessage);
     }
 
     public List<String> getSlowAnchorChannels(String guildId) {
-        List<String> channelIds = Main.jda.getGuildById(guildId).getTextChannels().stream().map(textChannel -> textChannel.getId()).collect(Collectors.toList());
-        List<String> stickyChannelIDs = new ArrayList<>();
-        for (String id : channelIds) {
-            if (Main.mapMessageSlow.containsKey(id)) {
-                stickyChannelIDs.add(id);
-            }
-        }
-        return stickyChannelIDs;
+        return BotUtil.activeChannelIds(Main.jda.getGuildById(guildId), Main.mapMessageSlow);
     }
 
-    public List<String> getEmbedStickyChannels(String guildId) {
-        List<String> channelIds = Main.jda.getGuildById(guildId).getTextChannels().stream().map(textChannel -> textChannel.getId()).collect(Collectors.toList());
-        List<String> stickyChannelIDs = new ArrayList<>();
-        for (String id : channelIds) {
-            if (Main.mapMessageEmbed.containsKey(id)) {
-                stickyChannelIDs.add(id);
-            }
-        }
-        return stickyChannelIDs;
+    public List<String> getEmbedPinChannels(String guildId) {
+        return BotUtil.activeChannelIds(Main.jda.getGuildById(guildId), Main.mapMessageEmbed);
     }
 
-    public List<String> getWebhookStickyChannels(String guildId) {
-        List<String> channelIds = Main.jda.getGuildById(guildId).getTextChannels().stream().map(textChannel -> textChannel.getId()).collect(Collectors.toList());
-        List<String> stickyChannelIDs = new ArrayList<>();
-        for (String id : channelIds) {
-            if (Main.webhookMessage.containsKey(id)) {
-                stickyChannelIDs.add(id);
-            }
-        }
-        return stickyChannelIDs;
+    public List<String> getWebhookPinChannels(String guildId) {
+        return BotUtil.activeChannelIds(Main.jda.getGuildById(guildId), Main.webhookMessage);
     }
 
 }
+

@@ -1,8 +1,8 @@
-import net.dv8tion.jda.api.events.channel.text.TextChannelDeleteEvent;
+import net.dv8tion.jda.api.events.channel.ChannelDeleteEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 public class DeleteChannelDBClear extends ListenerAdapter {
-    public void onTextChannelDelete(TextChannelDeleteEvent event) {
+    public void onChannelDelete(ChannelDeleteEvent event) {
         String channelId = event.getChannel().getId();
 
         Main.mapMessage.remove(channelId);
@@ -16,3 +16,4 @@ public class DeleteChannelDBClear extends ListenerAdapter {
         ConvexDb.deleteChannel(channelId);
     }
 }
+

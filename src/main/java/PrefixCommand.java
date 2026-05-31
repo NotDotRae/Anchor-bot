@@ -1,10 +1,14 @@
 import net.dv8tion.jda.api.Permission;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 public class PrefixCommand extends ListenerAdapter
 {
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
         String[] args = event.getMessage().getContentRaw().split("\\s+");
 
         String prefix = "?";
@@ -37,10 +41,13 @@ public class PrefixCommand extends ListenerAdapter
                 }
             }
 
-        if ( args[0].equalsIgnoreCase(Main.prefix + "resetprefix") || args[0].equalsIgnoreCase("?resetprefix") && (event.getMember().hasPermission(Permission.MANAGE_SERVER)) ) {
+        if ((args[0].equalsIgnoreCase(Main.prefix + "resetprefix") || args[0].equalsIgnoreCase(prefix + "resetprefix") || args[0].equalsIgnoreCase("?resetprefix"))
+                && event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
             Main.mapPrefix.remove(event.getGuild().getId());
             event.getMessage().reply("Prefix reset to `?`").queue();
             removeDB(event.getGuild().getId());
+        } else if (args[0].equalsIgnoreCase(Main.prefix + "resetprefix") || args[0].equalsIgnoreCase(prefix + "resetprefix") || args[0].equalsIgnoreCase("?resetprefix")) {
+            event.getMessage().reply(event.getMember().getAsMention() + " you need the `Manage Server` permission to use this command.").queue();
         }
     }
 
@@ -54,3 +61,4 @@ public class PrefixCommand extends ListenerAdapter
 
 
 }
+

@@ -1,13 +1,17 @@
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.awt.*;
 
 public class ShardCommands extends ListenerAdapter
 {
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
         String[] args = event.getMessage().getContentRaw().split("\\s+");
         String prefix = "?";
 
@@ -22,12 +26,12 @@ public class ShardCommands extends ListenerAdapter
         if (args[0].equalsIgnoreCase(prefix + "shard") || args[0].equalsIgnoreCase(prefix + "shards")) {
 
             EmbedBuilder emb = new EmbedBuilder();
-            emb.setColor(Color.ORANGE);
+            emb.setColor(BotStyle.PRIMARY);
             emb.setTitle("-Shard Info-");
             emb.addField("Shards: ", "Total Shards: " + (Main.jda.getShardsTotal()) +
                     "\nThis Guilds Shard: " + ((event.getGuild().getIdLong() >>> 22) % Main.jda.getShardsTotal()), false);
 
-            event.getChannel().sendMessage(emb.build()).queue();
+            event.getChannel().sendMessageEmbeds(emb.build()).queue();
 
         } else if (args[0].equalsIgnoreCase(prefix + "shardping")) {
             String pings = "__**Shard Pings:**__\n";
@@ -43,3 +47,4 @@ public class ShardCommands extends ListenerAdapter
     }
 
 }
+

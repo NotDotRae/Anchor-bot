@@ -10,23 +10,19 @@ application {
 
 version '1.0'
 
-sourceCompatibility = 11
-targetCompatibility = 11
+sourceCompatibility = 17
+targetCompatibility = 17
 
 
 
 repositories {
     mavenCentral()
-    maven { url 'https://jcenter.bintray.com/' }
     maven { url 'https://jitpack.io' }
-    maven {
-        name 'm2-dv8tion'
-        url 'https://m2.dv8tion.net/releases'
-    }
 }
 
 dependencies {
-    implementation 'net.dv8tion:JDA:4.3.0_309'
+    implementation 'net.dv8tion:JDA:6.4.1'
+    implementation 'org.slf4j:slf4j-simple:2.0.17'
     implementation 'com.github.DiscordBotList:DBL-Java-Library:2.0.1'
     implementation 'com.google.code.gson:gson:2.8.6'
     implementation 'com.konghq:unirest-java:3.4.00'

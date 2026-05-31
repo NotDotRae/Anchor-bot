@@ -1,9 +1,9 @@
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.entities.TextChannel;
-import net.dv8tion.jda.api.events.ReconnectedEvent;
-import net.dv8tion.jda.api.events.ResumedEvent;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.events.DisconnectEvent;
+import net.dv8tion.jda.api.events.session.SessionDisconnectEvent;
+import net.dv8tion.jda.api.events.session.SessionRecreateEvent;
+import net.dv8tion.jda.api.events.session.SessionResumeEvent;
 
 import java.awt.*;
 import java.time.format.DateTimeFormatter;
@@ -12,44 +12,56 @@ import java.time.format.FormatStyle;
 public class DisconnectEventMessages extends ListenerAdapter {
 
     @Override
-    public void onDisconnect(DisconnectEvent event) {
+    public void onSessionDisconnect(SessionDisconnectEvent event) {
         TextChannel log = Main.jda.getTextChannelById("853879746698018838");
+        if (log == null) {
+            return;
+        }
         EmbedBuilder emb = new EmbedBuilder();
 
         emb.setColor(Color.RED)
                 .setTitle("SHARD DISCONNECTED")
                 .setFooter("Time: " + event.getTimeDisconnected().format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)));
         if (event.isClosedByServer()) {
+            var frame = event.getServiceCloseFrame();
             emb.setDescription(
-                    "```" + event.getJDA().getShardInfo().getShardString() + "DISCONNECT [SERVER]\nCODE: [" + event.getServiceCloseFrame().getCloseCode() + "]\nREASON: " + event.getServiceCloseFrame().getCloseReason() +
+                    "```" + event.getJDA().getShardInfo().getShardString() + "DISCONNECT [SERVER]\nCODE: [" + (frame == null ? "N/A" : frame.getCloseCode()) + "]\nREASON: " + (frame == null ? "N/A" : frame.getCloseReason()) +
                             "\nSHARD STATUS: " + event.getJDA().getStatus()
                             + "```");
         } else {
+            var frame = event.getClientCloseFrame();
             emb.setDescription(
-                    "```" + event.getJDA().getShardInfo().getShardString() + "DISCONNECT [CLIENT]\nCODE: [" + event.getClientCloseFrame().getCloseCode() + "]\nREASON: " + event.getClientCloseFrame().getCloseReason() +
+                    "```" + event.getJDA().getShardInfo().getShardString() + "DISCONNECT [CLIENT]\nCODE: [" + (frame == null ? "N/A" : frame.getCloseCode()) + "]\nREASON: " + (frame == null ? "N/A" : frame.getCloseReason()) +
                             "\nSHARD STATUS: " + event.getJDA().getStatus() +
                             "```");
         }
-        log.sendMessage(emb.build()).queue();
+        log.sendMessageEmbeds(emb.build()).queue();
     }
 
     @Override
-    public void onResumed(ResumedEvent event) {
+    public void onSessionResume(SessionResumeEvent event) {
         TextChannel log = Main.jda.getTextChannelById("853879746698018838");
+        if (log == null) {
+            return;
+        }
         EmbedBuilder emb = new EmbedBuilder();
         emb.setColor(Color.GREEN)
                 .setTitle("SHARD RESUMED")
-                .setDescription("```" + event.getJDA().getShardInfo().getShardString() + "RESPONSE NUMBER: " + event.getResponseNumber() + "\nSHARD STATUS: " + event.getJDA().getStatus() + "```");
-        log.sendMessage(emb.build()).queue();
+                .setDescription("```" + event.getJDA().getShardInfo().getShardString() + "\nSHARD STATUS: " + event.getJDA().getStatus() + "```");
+        log.sendMessageEmbeds(emb.build()).queue();
     }
 
     @Override
-    public void onReconnected(ReconnectedEvent event) {
+    public void onSessionRecreate(SessionRecreateEvent event) {
         TextChannel log = Main.jda.getTextChannelById("853879746698018838");
+        if (log == null) {
+            return;
+        }
         EmbedBuilder emb = new EmbedBuilder();
         emb.setColor(Color.GREEN)
                 .setTitle("SHARD RECONNECTED")
-                .setDescription("```" + event.getJDA().getShardInfo().getShardString() + "RESPONSE NUMBER: " + event.getResponseNumber() + "\nSHARD STATUS: " + event.getJDA().getStatus() + "```");
-        log.sendMessage(emb.build()).queue();
+                .setDescription("```" + event.getJDA().getShardInfo().getShardString() + "\nSHARD STATUS: " + event.getJDA().getStatus() + "```");
+        log.sendMessageEmbeds(emb.build()).queue();
     }
 }
+

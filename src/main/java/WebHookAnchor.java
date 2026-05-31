@@ -5,16 +5,21 @@ import club.minnced.discord.webhook.send.WebhookEmbedBuilder;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
 import java.time.OffsetDateTime;
+import java.util.Objects;
 
 public class WebHookAnchor extends ListenerAdapter {
 
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
         String[] args = event.getMessage().getContentRaw().split("\\s+");
         String prefix = "?";
 
@@ -25,17 +30,6 @@ public class WebHookAnchor extends ListenerAdapter {
 
 
         if (args[0].equalsIgnoreCase(prefix + "setwebhook")) {
-
-            //If server is not features
-            if (false) {
-                EmbedBuilder emb = new EmbedBuilder();;
-                emb.setColor(Color.ORANGE)
-                        .setDescription("**Whoops!**\nThis feature command is available to all servers.");
-                event.getMessage().replyEmbeds(emb.build()).queue();
-                event.getMessage().addReaction("\u274C").queue();
-                return;
-            }
-
             //If there is already a URL, remove it
             if (Main.webhookURL.containsKey(event.getChannel().getId())) {
                 Main.webhookURL.remove(event.getChannel().getId());
@@ -50,16 +44,16 @@ public class WebHookAnchor extends ListenerAdapter {
             String o = event.getMessage().getContentRaw();
             String [] arr = o.split(" ", 2);
 
-            String url = arr[1];
+            String url = arr[1].trim();
+            if (!BotUtil.isDiscordWebhookUrl(url)) {
+                event.getMessage().reply("**Whoops!**\nPlease provide a valid Discord webhook URL.").queue();
+                return;
+            }
 
             Main.webhookURL.put(event.getChannel().getId(), url);
             addDBurl(event.getChannel().getId(), url);
-            event.getMessage().delete().queue();
-            try {
-                event.getMessage().delete().queue();
-            } catch (Exception e) {
-                event.getMessage().reply("*(I am missing `Manage Messages` permission, so just make sure to keep your WebHook URL a secret from server members)*").queue();
-            }
+            event.getMessage().delete().queue(null,
+                    error -> event.getMessage().reply("*(I am missing `Manage Messages` permission, so just make sure to keep your WebHook URL a secret from server members)*").queue());
             event.getChannel().sendMessage(event.getMember().getAsMention() + " DONE! WebHook URL has been set for this channel.\n*(If the WebHook gets deleted you will need to make a new one and set the WebHook URL again).*").queue();
 
         }
@@ -68,19 +62,9 @@ public class WebHookAnchor extends ListenerAdapter {
 
             if (!event.getMember().hasPermission(Permission.MESSAGE_MANAGE)) {
                 event.getMessage().reply(event.getMember().getAsMention() + "**Whoops!**\n You need the `MANAGE_MESSAGES` permission to use this command!").queue();
-                event.getMessage().addReaction("\u274C").queue();
+                BotUtil.react(event.getMessage(), "❌");
                 return;
             }
-
-            if (false) {
-                EmbedBuilder emb = new EmbedBuilder();;
-                emb.setColor(Color.ORANGE)
-                        .setDescription("**Whoops!**\nThis feature command is available to all servers.");
-                event.getMessage().replyEmbeds(emb.build()).queue();
-                event.getMessage().addReaction("\u274C").queue();
-                return;
-            }
-
 
             //if webhook URL is not yet set.
             if (!Main.webhookURL.containsKey(event.getChannel().getId())) {
@@ -88,62 +72,49 @@ public class WebHookAnchor extends ListenerAdapter {
                 emb.setDescription("**Whoops!**\nYou need to set the WebHook URL for this channel first!" +
                         "\nYou can do this by going to:\n`Channel Settings -> Integrations -> WebHooks -> New WebHook -> Copy WebHook URL`"
                     + "\nThen add the link by doing:\n`" + prefix + "setwebhook URL HERE` in the channel.")
-                        .setColor(Color.ORANGE);
-                event.getMessage().addReaction("\u274C").queue();
+                        .setColor(BotStyle.PRIMARY);
+                BotUtil.react(event.getMessage(), "❌");
                 event.getMessage().replyEmbeds(emb.build()).queue();
+                return;
+            }
+            if (!BotUtil.isDiscordWebhookUrl(Main.webhookURL.get(event.getChannel().getId()))) {
+                event.getMessage().reply("**Whoops!**\nThe stored webhook URL is not valid anymore. Set a new Discord webhook URL with `" + prefix + "setwebhook URL HERE`.").queue();
                 return;
             }
 
 
             String o = event.getMessage().getContentRaw();
             String[] arr = o.split(" ", 2);
+            if (arr.length < 2 || arr[1].trim().isEmpty()) {
+                event.getMessage().reply("**Whoops!**\nPlease provide a message:\n`" + prefix + "stickwebhook YOUR MESSAGE HERE`").queue();
+                return;
+            }
 
-            String message = arr[1].trim();
+            String message = BotUtil.stripCustomEmoji(arr[1]);
 
             Main.webhookMessage.put(event.getChannel().getId(), message);
             addDBmessage(event.getChannel().getId(), message);
 
-            // Using the builder
-            WebhookClientBuilder builder = new WebhookClientBuilder(Main.webhookURL.get(event.getChannel().getId()));
-            builder.setThreadFactory((job) -> {
-                Thread thread = new Thread(job);
-                thread.setName("webhookThread");
-                thread.setDaemon(true);
-                return thread;
-            });
-            builder.setWait(true);
-            WebhookClient client = builder.build();
+            sendStoredWebhookPin(event.getChannel().getId());
 
-            WebhookEmbedBuilder embed = new WebhookEmbedBuilder()
-                    .setColor(event.getGuild().getMemberById(Main.botId).getColorRaw())
-                    .setDescription(Main.webhookMessage.get(event.getChannel().getId()));
-
-
-            if (Main.mapImageLinkEmbed.containsKey(event.getChannel().getId())) {
-                embed.setThumbnailUrl(Main.mapImageLinkEmbed.get(event.getChannel().getId()));
-            }
-            if (Main.mapBigImageLinkEmbed.containsKey(event.getChannel().getId())) {
-                embed.setImageUrl(Main.mapBigImageLinkEmbed.get(event.getChannel().getId()));
-            }
-
-            client.send(SilentMessages.webhook(embed.build()));
-            client.close();
-
-            event.getMessage().addReaction("\u2705").queue();
+            BotUtil.react(event.getMessage(), "✅");
             return;
         }
 
         if (args[0].equalsIgnoreCase(prefix + "webhookstop")) {
             if (!event.getMember().hasPermission(Permission.MESSAGE_MANAGE)) {
                 event.getMessage().reply(event.getMember().getAsMention() + "**Whoops!**\n You need the `MANAGE_MESSAGES` permission to use this command!").queue();
-                event.getMessage().addReaction("\u274C").queue();
+                BotUtil.react(event.getMessage(), "❌");
                 return;
             }
 
             if (Main.webhookMessage.containsKey(event.getChannel().getId())) {
+                String channelId = event.getChannel().getId();
                 event.getChannel().getHistory().retrievePast(8).queue(history -> {
-                    for (Message m : history.subList(0, 5)) {
-                        if (m.isWebhookMessage() && !m.getEmbeds().isEmpty() && m.getEmbeds().get(0).getDescription().equals(Main.webhookMessage.get(event.getChannel().getId()))) {
+                    int limit = Math.min(history.size(), 5);
+                    for (int i = 0; i < limit; i++) {
+                        Message m = history.get(i);
+                        if (isStoredWebhookPin(m, channelId)) {
                             m.delete().queue();
                         }
                     }
@@ -151,13 +122,13 @@ public class WebHookAnchor extends ListenerAdapter {
 
                 Main.webhookMessage.remove(event.getChannel().getId());
                 removeDBmessage(event.getChannel().getId());
-                event.getMessage().addReaction("\u2705").queue();
+                BotUtil.react(event.getMessage(), "✅");
             }
         }
 
 
 
-        //do sticky stuff
+        //do pin work
         if (Main.webhookMessage.containsKey(event.getChannel().getId())) {
             String channelId = event.getChannel().getId();
 
@@ -167,88 +138,80 @@ public class WebHookAnchor extends ListenerAdapter {
                 Boolean check = false;
 
                 try {
-                    for (Message m : history.subList(0, 5)) {
-                        //if message is sticky message
-                        if (m.isWebhookMessage() && !m.getEmbeds().isEmpty() && m.getEmbeds().get(0).getDescription().equals(Main.webhookMessage.get(channelId))) {
+                    int recentLimit = Math.min(history.size(), 5);
+                    for (int i = 0; i < recentLimit; i++) {
+                        Message m = history.get(i);
+                        //if message is pin message
+                        if (isStoredWebhookPin(m, channelId)) {
                             check = true;
                             //if message is older then 30 sec
                             if (m.getTimeCreated().compareTo(OffsetDateTime.now().minusSeconds(15)) < 0) {
                                 m.delete().queue(null, (error) -> {});
-                                //send new sticky
-                                // Using the builder
-                                WebhookClientBuilder builder = new WebhookClientBuilder(Main.webhookURL.get(channelId)); // or id, token
-                                builder.setThreadFactory((job) -> {
-                                    Thread thread = new Thread(job);
-                                    thread.setName("webhookThread");
-                                    thread.setDaemon(true);
-                                    return thread;
-                                });
-
-                                builder.setWait(true);
-                                WebhookClient client = builder.build();
-
-                                WebhookEmbedBuilder embed = new WebhookEmbedBuilder()
-                                        .setColor(event.getGuild().getMemberById(Main.botId).getColorRaw())
-                                        .setDescription(Main.webhookMessage.get(channelId));
-
-
-                                if (Main.mapImageLinkEmbed.containsKey(channelId)) {
-                                     embed.setThumbnailUrl(Main.mapImageLinkEmbed.get(channelId));
-                                }
-                                if (Main.mapBigImageLinkEmbed.containsKey(channelId)) {
-                                    embed.setImageUrl(Main.mapBigImageLinkEmbed.get(channelId));
-                                }
-
-                                client.send(SilentMessages.webhook(embed.build()));
-                                client.close();
+                                sendStoredWebhookPin(channelId);
                             }
                             break;
                         }
                     }
 
-                    //if check = true (is set to true if 1 of last 5 are the sticky)
+                    //if check = true (is set to true if 1 of last 5 are the pin)
                     if (!check) {
-                            for (Message m : history.subList(0, 7)) {
-                                if (m.isWebhookMessage() && !m.getEmbeds().isEmpty() && m.getEmbeds().get(0).getDescription().equals(Main.webhookMessage.get(channelId))) {
+                            int cleanupLimit = Math.min(history.size(), 7);
+                            for (int i = 0; i < cleanupLimit; i++) {
+                                Message m = history.get(i);
+                                if (isStoredWebhookPin(m, channelId)) {
                                     m.delete().queue(null, (error) -> {});
                                 }
                             }
 
-                        //send new sticky
-                        // Using the builder
-                        WebhookClientBuilder builder = new WebhookClientBuilder(Main.webhookURL.get(channelId)); // or id, token
-                        builder.setThreadFactory((job) -> {
-                            Thread thread = new Thread(job);
-                            thread.setName("webhookThread");
-                            thread.setDaemon(true);
-                            return thread;
-                        });
-
-                        builder.setWait(true);
-                        WebhookClient client = builder.build();
-
-                        WebhookEmbedBuilder embed = new WebhookEmbedBuilder()
-                                .setColor(event.getGuild().getMemberById(Main.botId).getColorRaw())
-                                .setDescription(Main.webhookMessage.get(channelId));
-
-
-                        if (Main.mapImageLinkEmbed.containsKey(channelId)) {
-                            embed.setThumbnailUrl(Main.mapImageLinkEmbed.get(channelId));
-                        }
-                        if (Main.mapBigImageLinkEmbed.containsKey(channelId)) {
-                            embed.setImageUrl(Main.mapBigImageLinkEmbed.get(channelId));
-                        }
-
-                        client.send(SilentMessages.webhook(embed.build()));
-                        client.close();
+                        sendStoredWebhookPin(channelId);
                     }
 
                 } catch (Exception e) {
-                    //do nothing
+                    System.err.println("Webhook pin repost failed: " + e.getMessage());
                 }
                 });
         }
 
+    }
+
+    private boolean isStoredWebhookPin(Message message, String channelId) {
+        return message.isWebhookMessage()
+                && !message.getEmbeds().isEmpty()
+                && Objects.equals(message.getEmbeds().get(0).getDescription(), Main.webhookMessage.get(channelId));
+    }
+
+    private void sendStoredWebhookPin(String channelId) {
+        String webhookUrl = Main.webhookURL.get(channelId);
+        if (!BotUtil.isDiscordWebhookUrl(webhookUrl) || !Main.webhookMessage.containsKey(channelId)) {
+            return;
+        }
+
+        WebhookClientBuilder builder = new WebhookClientBuilder(webhookUrl);
+        builder.setThreadFactory((job) -> {
+            Thread thread = new Thread(job);
+            thread.setName("webhookThread");
+            thread.setDaemon(true);
+            return thread;
+        });
+        builder.setWait(true);
+
+        WebhookClient client = builder.build();
+        try {
+            WebhookEmbedBuilder embed = new WebhookEmbedBuilder()
+                    .setColor(BotStyle.PRIMARY_RAW)
+                    .setDescription(Main.webhookMessage.get(channelId));
+
+            if (Main.mapImageLinkEmbed.containsKey(channelId)) {
+                embed.setThumbnailUrl(Main.mapImageLinkEmbed.get(channelId));
+            }
+            if (Main.mapBigImageLinkEmbed.containsKey(channelId)) {
+                embed.setImageUrl(Main.mapBigImageLinkEmbed.get(channelId));
+            }
+
+            client.send(SilentMessages.webhook(embed.build()));
+        } finally {
+            client.close();
+        }
     }
 
     public void addDBurl(String channelId, String url) {
@@ -270,3 +233,4 @@ public class WebHookAnchor extends ListenerAdapter {
     }
 
 }
+

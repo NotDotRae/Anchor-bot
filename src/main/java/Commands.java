@@ -1,7 +1,7 @@
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.awt.*;
@@ -19,7 +19,11 @@ import java.util.List;
 import static java.time.temporal.ChronoUnit.DAYS;
 
 public class Commands extends ListenerAdapter {
-            public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+            public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
                 String[] args = event.getMessage().getContentRaw().split("\\s+");
                 String prefix = "?";
 
@@ -53,7 +57,7 @@ public class Commands extends ListenerAdapter {
             long numberOfSeconds = uptimeInSeconds % 60;
 
                 EmbedBuilder eb = new EmbedBuilder();
-                eb.setColor(Color.orange);
+                eb.setColor(BotStyle.PRIMARY);
                 eb.setTitle("**-AnchorBot Information-**");
                 eb.addField("Developed By:", "the bot owner\n(`0`)", false);
                 eb.addField("Ping:", Main.jda.getAverageGatewayPing() + "ms", false);
@@ -62,7 +66,7 @@ public class Commands extends ListenerAdapter {
                 eb.addField("Guilds:", "AnchorBot is in **" + NumberFormat.getInstance().format(Main.jda.getGuildCache().size()) + "** Guilds", false);
                 eb.addField("Included Features: ", "All pin and embed features are free to use.", false);
                 eb.addField("**Commands:** ", "Do ``?commands`` or ``?help``", false);
-                eb.setFooter("AnchorBot is Made with Java & JDA", Main.jda.getShards().get(0).getSelfUser().getAvatarUrl());
+                eb.setFooter("AnchorBot is Made with Java & JDA", BotUtil.botAvatarUrl());
 
                 event.getMessage().replyEmbeds(eb.build()).queue();
 
@@ -85,7 +89,7 @@ public class Commands extends ListenerAdapter {
                                 "**Members:** " + NumberFormat.getInstance().format(event.getGuild().retrieveMetaData().complete().getApproximateMembers()) + "\n" +
                                 //"**Bots:** " + BotCount(event.getGuild()) + "\n" +
                                 "**Owner:** " + event.getGuild().retrieveOwner().complete().getAsMention() + "\n" +
-                                "**Region: ** " + event.getGuild().getRegion().getName() + " " + event.getGuild().getRegion().getEmoji() + "\n" +
+                                "**Locale:** " + event.getGuild().getLocale().getLocale() + "\n" +
                                 "**Nitro Boosting: ** " + GuildBoost(event.getGuild()) + "\n" +
                                 "**Number of Roles:** " + event.getGuild().getRoles().size() + "\n" +
                                 "**Text Channels:** " + event.getGuild().getTextChannels().size() + "\n" +
@@ -93,10 +97,10 @@ public class Commands extends ListenerAdapter {
                         , false);
 
 
-                emb.setColor(Color.orange);
+                emb.setColor(BotStyle.PRIMARY);
                 emb.setFooter(event.getGuild().getName(), event.getGuild().getIconUrl());
 
-                event.getMessage().reply(emb.build()).queue();
+                event.getMessage().replyEmbeds(emb.build()).queue();
             }
 
                //UPTIME
@@ -132,19 +136,19 @@ public class Commands extends ListenerAdapter {
 
                 try {
                    if (!args[1].isEmpty()) {
-                       pollQ = String.join(" ", args).substring(5);
+                       pollQ = BotUtil.stripCustomEmoji(String.join(" ", args).substring(5));
 
                        EmbedBuilder emb = new EmbedBuilder();
-                       emb.setColor(event.getGuild().getMemberById(Main.botId).getColor());
+                       emb.setColor(BotStyle.PRIMARY);
                        emb.setFooter("Poll by: " + event.getAuthor().getAsTag(), event.getAuthor().getAvatarUrl());
 
                        emb.setDescription(pollQ.trim());
 
                        //adds reactions to poll message
-                       event.getChannel().sendMessage(emb.build()).queue(m -> {
-                           m.addReaction("\ud83d\udc4d").queue();
-                           m.addReaction("\uD83D\uDC4E").queue();
-                           m.addReaction("\uD83E\uDD37").queue();
+                       event.getChannel().sendMessageEmbeds(emb.build()).queue(m -> {
+                           BotUtil.react(m, "👍");
+                           BotUtil.react(m, "👎");
+                           BotUtil.react(m, "🤷");
                        });
                        event.getMessage().delete().queue();
                    }
@@ -164,9 +168,9 @@ public class Commands extends ListenerAdapter {
                    Member taggedMember;
 
                    if (event.getMessage().getContentRaw().contains("@")) {
-                       tagUser = event.getMessage().getMentionedUsers().get(0);
-                       taggedMember = event.getMessage().getMentionedMembers().get(0);
-                   } else if (args.length == 2 && args[1].length() == 18 && !args[0].contains("[a-zA-Z]+")) {
+                       tagUser = event.getMessage().getMentions().getUsers().get(0);
+                       taggedMember = event.getMessage().getMentions().getMembers().get(0);
+                   } else if (args.length == 2 && args[1].matches("\\d{17,19}")) {
                         try {
                             taggedMember = event.getGuild().retrieveMemberById(args[1]).complete();
                             tagUser = Main.jda.retrieveUserById(args[1]).complete();
@@ -187,59 +191,61 @@ public class Commands extends ListenerAdapter {
                    String daysJoined = numberOfDaysJoined(taggedMember);
 
                    EnumSet<User.UserFlag> badges = tagUser.getFlags();
-                   String badgesEmotes = "";
+                   String badgesText = "";
 
                    System.out.println(tagUser.getFlags().toString());
 
                    if(badges.contains(User.UserFlag.BUG_HUNTER_LEVEL_1) || badges.contains(User.UserFlag.BUG_HUNTER_LEVEL_2)) {
-                        badgesEmotes += "<:bughunter:865689196570869770> ";
+                        badgesText += "Bug Hunter, ";
                    }if(badges.contains(User.UserFlag.CERTIFIED_MODERATOR)) {
-                       badgesEmotes += "<:mod:865689196529188884> ";
+                       badgesText += "Certified Moderator, ";
                    }if(badges.contains(User.UserFlag.EARLY_SUPPORTER)) {
-                       badgesEmotes += "<:supporter:865689196589219880> ";
+                       badgesText += "Early Supporter, ";
                    }if(badges.contains(User.UserFlag.HYPESQUAD_BALANCE)) {
-                       badgesEmotes += "<:balance:865689196466143232> ";
+                       badgesText += "HypeSquad Balance, ";
                    }if(badges.contains(User.UserFlag.HYPESQUAD_BRAVERY)) {
-                       badgesEmotes += "<:bravery:865689196597084200> ";
+                       badgesText += "HypeSquad Bravery, ";
                    }if(badges.contains(User.UserFlag.HYPESQUAD_BRILLIANCE)) {
-                       badgesEmotes += "<:brilliance:865692499648446505> ";
+                       badgesText += "HypeSquad Brilliance, ";
                    }if(badges.contains(User.UserFlag.PARTNER)) {
-                       badgesEmotes += "<:partner:865689196668911656> ";
+                       badgesText += "Partner, ";
                    }if(badges.contains(User.UserFlag.STAFF)) {
-                       badgesEmotes += "<:staff:865689196568248351> ";
+                       badgesText += "Staff, ";
                    }if(badges.contains(User.UserFlag.VERIFIED_DEVELOPER)) {
-                       badgesEmotes += "<:DiscordBotDev:730213279707693167> ";
+                       badgesText += "Verified Developer, ";
                    }if(!boostCheck(taggedMember).equals("Member not boosting.")) {
-                       badgesEmotes += "<:boost:865689196449234985> ";
+                       badgesText += "Server Booster, ";
                    }if(tagUser.getEffectiveAvatarUrl().endsWith(".gif")) {
-                       badgesEmotes += "<:nitro:865689196249612299> ";
-                   } if(badgesEmotes.equals("")) {
-                       badgesEmotes = "None";
+                       badgesText += "Nitro, ";
+                   } if(badgesText.isEmpty()) {
+                       badgesText = "None";
+                   } else {
+                       badgesText = badgesText.substring(0, badgesText.length() - 2);
                    }
 
 
                    emb.setThumbnail(tagUser.getEffectiveAvatarUrl());
                    emb.setTitle("**-User Info-**");
                    emb.addField("Info for " + tagUser.getName() + "#" + tagUser.getDiscriminator(),
-                           "<:settings:865689196567724052> **User ID:** ``" + tagUser.getId() + "``\n" +
-                                   "<:add:865689196492750848> **Nickname:** " + taggedMember.getEffectiveName() + "\n" +
-                                   "<:rules:865689196332056607> **Join Date:** <t:" + taggedMember.getTimeJoined().toEpochSecond() + ":R>, *" +  NumberFormat.getInstance().format(Integer.parseInt(daysJoined)) + "* days\n" +
+                           "**User ID:** ``" + tagUser.getId() + "``\n" +
+                                   "**Nickname:** " + taggedMember.getEffectiveName() + "\n" +
+                                   "**Join Date:** <t:" + taggedMember.getTimeJoined().toEpochSecond() + ":R>, *" +  NumberFormat.getInstance().format(Integer.parseInt(daysJoined)) + "* days\n" +
                                    //"**Join Position:** " + joinSpot + "\n" +
-                                   "<:rules:865689196332056607> **Creation Date:** <t:" + tagUser.getTimeCreated().toEpochSecond() + ":R>, *" + NumberFormat.getInstance().format(Integer.parseInt(numberOfDaysCreated(taggedMember))) + "* days\n" +
+                                   "**Creation Date:** <t:" + tagUser.getTimeCreated().toEpochSecond() + ":R>, *" + NumberFormat.getInstance().format(Integer.parseInt(numberOfDaysCreated(taggedMember))) + "* days\n" +
                                    //"**Status:** " + taggedMember.getOnlineStatus().getKey() + "\n" +
-                                   "<:info:865689196521193482> **Badges: **" + badgesEmotes + "\n" +
-                                   "<:__:865689196446089256> **Tag: ** " + taggedMember.getAsMention() + "\n" +
-                                   "<:boost:865689196449234985> **Nitro Boosting: ** " + boostCheck(taggedMember) + "\n" +
-                                   "<:roles:865690170229391420> **Number of Roles:** " + taggedMember.getRoles().size()
+                                   "**Badges: **" + badgesText + "\n" +
+                                   "**Tag: ** " + taggedMember.getAsMention() + "\n" +
+                                   "**Nitro Boosting: ** " + boostCheck(taggedMember) + "\n" +
+                                   "**Number of Roles:** " + taggedMember.getRoles().size()
                            , false);
 
                    if (getRoles(taggedMember).length() > 1000) {
-                       emb.addField("<:roles:865690170229391420> **Roles: **", "Reached Max Embed Length. *(Too many roles to display)*", false );
+                       emb.addField("**Roles: **", "Reached Max Embed Length. *(Too many roles to display)*", false );
                    } else {
-                       emb.addField("<:roles:865690170229391420> **Roles: **", getRoles(taggedMember), false );
+                       emb.addField("**Roles: **", getRoles(taggedMember), false );
                    }
 
-                   emb.setColor(taggedMember.getColor());
+                   emb.setColor(BotStyle.PRIMARY);
 
                if (taggedMember.hasPermission(Permission.ADMINISTRATOR)) {
                    emb.setFooter(tagUser.getName() + " is a Admin", tagUser.getEffectiveAvatarUrl());
@@ -249,7 +255,7 @@ public class Commands extends ListenerAdapter {
 
                event.getMessage().replyEmbeds(emb.build()).queue(m -> {
                    if (Integer.valueOf(daysJoined) == 365 || Integer.valueOf(daysJoined) == 730 || Integer.valueOf(daysJoined) == 1095 || Integer.valueOf(daysJoined) == 1460 || Integer.valueOf(daysJoined) == 1825 || Integer.valueOf(daysJoined) == 2190) {
-                       m.addReaction("\uD83C\uDF89").queue();
+                       BotUtil.react(m, "🎉");
                    }
                });
 
@@ -280,7 +286,7 @@ public class Commands extends ListenerAdapter {
             //ADVANCED
             else if (args[0].equalsIgnoreCase(prefix + "features") || args[0].equalsIgnoreCase(prefix + "anchorbotfeatures")) {
                 EmbedBuilder embed = new EmbedBuilder();
-                embed.setColor(Color.ORANGE);
+                embed.setColor(BotStyle.PRIMARY);
                 embed.setTitle("-AnchorBot-");
                 embed.addField("Features:", "-Unlimited pinned messages." +
                         "\n-Use Custom Embeds as pins." +
@@ -302,8 +308,8 @@ public class Commands extends ListenerAdapter {
                 }
                try {
                    EmbedBuilder emb = new EmbedBuilder();
-                    emb.setDescription(event.getMessage().getContentRaw().replace(prefix + "embed", ""));
-                    emb.setColor(event.getGuild().getMemberById(Main.botId).getColor());
+                    emb.setDescription(BotUtil.stripCustomEmoji(event.getMessage().getContentRaw().replace(prefix + "embed", "")));
+                    emb.setColor(BotStyle.PRIMARY);
                     emb.setFooter("Embed By: " + event.getMember().getUser().getName());
                     event.getChannel().sendMessageEmbeds(emb.build()).queue();
                } catch (Exception e) {
@@ -332,22 +338,20 @@ public class Commands extends ListenerAdapter {
                 String uEE;
 
 
-            if (event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_HISTORY)) {mH = "java";} else {mH = "c";}
-            if (event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_MANAGE)) {mM = "java";} else {mM = "c";}
-            if (event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_EMBED_LINKS)) {eL = "java";} else {eL = "c";}
-            if (event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_ADD_REACTION)) {aMR = "java";} else {aMR = "c";}
-            if (event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_EXT_EMOJI)) {uEE = "java";} else {uEE = "c";}
+            if (event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_HISTORY)) {mH = "java";} else {mH = "c";}
+            if (event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_MANAGE)) {mM = "java";} else {mM = "c";}
+            if (event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_EMBED_LINKS)) {eL = "java";} else {eL = "c";}
+            if (event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_ADD_REACTION)) {aMR = "java";} else {aMR = "c";}
 
 
             String result = "**AnchorBot has the following permissions in this CHANNEL:**\n\n";
                 result +=
-                        "```" + mH + "\nMessage History: " + event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_HISTORY) + "```" +
-                                   "```" + mM + "\nManage Messages: " + event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_MANAGE) + "```" +
-                                   "```" + eL + "\nEmbed Links: " + event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_EMBED_LINKS) + "```" +
-                                   "```" + aMR + "\nAdd Message Reactions: " + event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_ADD_REACTION) + "```" +
-                                    "```" + uEE + "\nUse External Emojis: " + event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_EXT_EMOJI) + "```";
+                        "```" + mH + "\nMessage History: " + event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_HISTORY) + "```" +
+                                   "```" + mM + "\nManage Messages: " + event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_MANAGE) + "```" +
+                                   "```" + eL + "\nEmbed Links: " + event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_EMBED_LINKS) + "```" +
+                                   "```" + aMR + "\nAdd Message Reactions: " + event.getGuild().getSelfMember().hasPermission(event.getGuildChannel(), Permission.MESSAGE_ADD_REACTION) + "```";
 
-                if(mH.equals("c") || mM.equals("c") || eL.equals("c") || aMR.equals("c") || uEE.equals("c")) {
+                if(mH.equals("c") || mM.equals("c") || eL.equals("c") || aMR.equals("c")) {
                     result += "\n__Make sure these permissions are enabled for AnchorBot in your channel and server settings.__\n";
                 }
 
@@ -357,7 +361,7 @@ public class Commands extends ListenerAdapter {
             }
             //IF BOT IS MENTIONED
 
-        else if (!event.getMessage().getMentionedMembers().isEmpty() && event.getMessage().getMentionedMembers().get(0).getUser().getId().equals(Main.botId) && event.getMessage().getReferencedMessage() == null) {
+        else if (!event.getMessage().getMentions().getMembers().isEmpty() && event.getMessage().getMentions().getMembers().get(0).getUser().getId().equals(Main.botId) && event.getMessage().getReferencedMessage() == null) {
                 event.getMessage().reply("**Hey!**\uD83D\uDC4B\nMy prefix in this server is: `" + prefix + "`.\nUse the `" + prefix + "help` command to get a list of commands.").queue();
 
         }
@@ -428,5 +432,4 @@ public class Commands extends ListenerAdapter {
     }
 
 }
-
 

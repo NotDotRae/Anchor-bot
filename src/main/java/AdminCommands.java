@@ -2,7 +2,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Invite;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import org.apache.commons.io.FileUtils;
@@ -20,7 +20,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class AdminCommands extends ListenerAdapter {
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
         String[] args = event.getMessage().getContentRaw().split("\\s+");
 
         if (event.getAuthor().isBot()) {
@@ -34,8 +38,7 @@ public class AdminCommands extends ListenerAdapter {
                     .addField("Staff Commands:",
                             "`?shardping` - Get pings and status for all shards.\n" +
                                     "`?getshard <server ID>` - Get the shard number a server is on.\n" +
-                                    "`?restartshard <shard>` - Restart a specific shard *(Restricted to Management Team)*.\n" +
-                                    "`?getshard <server ID>` - Get the shard number a server is on."
+                                    "`?restartshard <shard>` - Restart a specific shard *(Restricted to Management Team)*."
                             , false)
                     .addField("Dev Only Commands:",
                             "`?manualstop <channel ID>` - Stop a pin in the specified channel.\n" +
@@ -43,8 +46,8 @@ public class AdminCommands extends ListenerAdapter {
                                     "`?shutdown` - Shutdown AnchorBot.\n" +
                                     "`?adminstats` - Get VPS stats.", false);
 
-            emb.setColor(Color.ORANGE);
-            event.getMessage().reply(emb.build()).queue();
+            emb.setColor(BotStyle.PRIMARY);
+            event.getMessage().replyEmbeds(emb.build()).queue();
 
         }
 
@@ -77,16 +80,16 @@ public class AdminCommands extends ListenerAdapter {
                 Main.mapMessage.remove(args[1]);
 
                     ConvexDb.delete(DbKinds.STICKY, args[1]);
-                    System.out.println("removed sticky message.");
+                    System.out.println("removed pin message.");
                     event.getChannel().sendMessage("Stopped anchored message.").queue();
                 } else if (Main.mapMessageEmbed.containsKey(args[1])) {
                     Main.mapMessageEmbed.remove(args[1]);
                     ConvexDb.delete(DbKinds.EMBED_STICKY, args[1]);
-                    System.out.println("removed sticky message.");
+                    System.out.println("removed pin message.");
                     event.getChannel().sendMessage("Stopped anchored embed.").queue();
 
                 } else {
-                    System.out.println("no active sticky in that channel or other error.");
+                    System.out.println("no active pin in that channel or other error.");
                     event.getChannel().sendMessage("no active pin in that channel or other error").queue();
                 }
 
@@ -109,7 +112,7 @@ public class AdminCommands extends ListenerAdapter {
                 EmbedBuilder emb = new EmbedBuilder();
 
                 emb.setTitle("AnchorBot Admin Stats");
-                emb.setColor(Color.ORANGE);
+                emb.setColor(BotStyle.PRIMARY);
                 emb.setDescription("Runtime and shard status for AnchorBot.");
 
                 /* Total number of processors or cores available to the JVM */
@@ -158,10 +161,10 @@ public class AdminCommands extends ListenerAdapter {
                 emb.addField("Shard Pings", pings, false);
 
                 emb.setFooter(event.getMessage().getTimeCreated().format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)));
-                event.getChannel().sendMessage(emb.build()).queue();
+                event.getChannel().sendMessageEmbeds(emb.build()).queue();
 
             } else {
-                event.getMessage().addReaction("\u274C").queue();
+                BotUtil.react(event.getMessage(), "❌");
             }
             }
 
@@ -209,3 +212,4 @@ public class AdminCommands extends ListenerAdapter {
 
     }
 }
+

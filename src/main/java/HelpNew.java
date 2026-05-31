@@ -1,16 +1,20 @@
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.entities.Emoji;
-import net.dv8tion.jda.api.events.interaction.ButtonClickEvent;
-import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-import net.dv8tion.jda.api.interactions.components.Button;
 
 import java.awt.*;
 
 public class HelpNew extends ListenerAdapter {
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
         String[] args = event.getMessage().getContentRaw().split("\\s+");
 
         if (event.getAuthor().isBot()) {
@@ -20,8 +24,8 @@ public class HelpNew extends ListenerAdapter {
         String prefix = currentPrefix(event.getGuild().getId());
         if (args[0].equalsIgnoreCase(prefix + "help") || args[0].equalsIgnoreCase(prefix + "commands") || args[0].equalsIgnoreCase(Main.prefix + "help")) {
             try {
-                event.getMessage().replyEmbeds(stickyHelp(prefix).build())
-                        .setActionRows(navButtons("sticky"))
+                event.getMessage().replyEmbeds(pinHelp(prefix).build())
+                        .setComponents(navButtons("pin"))
                         .queue(null, error -> event.getChannel().sendMessage("I need the `Embed Links` permission.").queue());
             } catch (Exception e) {
                 event.getMessage().reply("I need the `Embed Links` permission.").queue();
@@ -29,33 +33,39 @@ public class HelpNew extends ListenerAdapter {
         }
     }
 
-    public void onSlashCommand(SlashCommandEvent event) {
+    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("help")) {
             return;
         }
 
         String prefix = event.getGuild() == null ? "?" : currentPrefix(event.getGuild().getId());
         try {
-            event.replyEmbeds(stickyHelp(prefix).build())
-                    .addActionRows(navButtons("sticky"))
+            event.replyEmbeds(pinHelp(prefix).build())
+                    .addComponents(navButtons("pin"))
                     .queue(null, error -> event.reply("I need the `Embed Links` permission.").setEphemeral(true).queue());
         } catch (Exception e) {
             event.reply("I need the `Embed Links` permission.").setEphemeral(true).queue();
         }
     }
 
-    public void onButtonClick(ButtonClickEvent event) {
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        if (event.getGuild() == null || event.getButton() == null) {
+            return;
+        }
+        String buttonId = event.getButton().getCustomId();
+        if (buttonId == null) {
+            return;
+        }
         String prefix = currentPrefix(event.getGuild().getId());
-        String buttonId = event.getButton().getId();
 
-        if (buttonId.equals("sticky")) {
-            event.editMessageEmbeds(stickyHelp(prefix).build()).setActionRows(navButtons("sticky")).queue();
+        if (buttonId.equals("pin") || buttonId.equals("sticky")) {
+            event.editMessageEmbeds(pinHelp(prefix).build()).setComponents(navButtons("pin")).queue();
         } else if (buttonId.equals("utility")) {
-            event.editMessageEmbeds(utilityHelp(prefix).build()).setActionRows(navButtons("utility")).queue();
+            event.editMessageEmbeds(utilityHelp(prefix).build()).setComponents(navButtons("utility")).queue();
         } else if (buttonId.equals("other")) {
-            event.editMessageEmbeds(otherHelp(prefix).build()).setActionRows(navButtons("other")).queue();
+            event.editMessageEmbeds(otherHelp(prefix).build()).setComponents(navButtons("other")).queue();
         } else if (buttonId.equals("features")) {
-            event.editMessageEmbeds(featuresHelp(prefix).build()).setActionRows(navButtons("features")).queue();
+            event.editMessageEmbeds(featuresHelp(prefix).build()).setComponents(navButtons("features")).queue();
         }
     }
 
@@ -66,15 +76,15 @@ public class HelpNew extends ListenerAdapter {
     private static EmbedBuilder baseEmbed(String title, String prefix) {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle(title);
-        embed.setColor(Color.ORANGE);
+        embed.setColor(BotStyle.PRIMARY);
         embed.setDescription("Do not include `<>` when using commands.");
         embed.addField("Prefix:", "This guild's prefix: `" + prefix + "`", true);
         embed.addField("Feature Access:", AdvancedStatus(), true);
-        embed.setFooter("Click a button to see other commands.", Main.jda.getShards().get(0).getSelfUser().getAvatarUrl());
+        embed.setFooter("Click a button to see other commands.", BotUtil.botAvatarUrl());
         return embed;
     }
 
-    private static EmbedBuilder stickyHelp(String prefix) {
+    private static EmbedBuilder pinHelp(String prefix) {
         return baseEmbed("**-AnchorBot Commands-**", prefix)
                 .addField("Pin Commands:", "``" + prefix + "stick <message>`` - Pins message to the channel.\n" +
                         "``" + prefix + "stickstop`` - Cancels the pinned message.\n" +
@@ -119,7 +129,7 @@ public class HelpNew extends ListenerAdapter {
 
     private static ActionRow navButtons(String selected) {
         return ActionRow.of(
-                button("sticky", "Pin", "\uD83D\uDCCC", selected),
+                button("pin", "Pin", "\uD83D\uDCCC", selected),
                 button("utility", "Utility", "\uD83C\uDF9B", selected),
                 button("other", "Other", "\uD83D\uDCC3", selected),
                 button("features", "Features", "\uD83E\uDDE1", selected));
@@ -127,10 +137,11 @@ public class HelpNew extends ListenerAdapter {
 
     private static Button button(String id, String label, String emoji, String selected) {
         Button button = selected.equals(id) ? Button.success(id, label) : Button.primary(id, label);
-        return button.withEmoji(Emoji.fromMarkdown(emoji));
+        return button.withEmoji(Emoji.fromUnicode(emoji));
     }
 
     public static String AdvancedStatus() {
         return "`All Features Active`";
     }
 }
+

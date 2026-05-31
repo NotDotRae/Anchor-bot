@@ -66,16 +66,19 @@ public class Main {
 
         jda = DefaultShardManagerBuilder.create(token,
                 GatewayIntent.GUILD_MESSAGES,
-                GatewayIntent.GUILD_MESSAGE_REACTIONS
+                GatewayIntent.GUILD_MESSAGE_REACTIONS,
+                GatewayIntent.MESSAGE_CONTENT
                 ).setChunkingFilter(ChunkingFilter.NONE).setMemberCachePolicy(MemberCachePolicy.NONE)
                  .addEventListeners(
                          new Commands(),
+                         new SlashCommandHandler(),
                          new JoinNewGuild(),
                          new DeleteChannelDBClear(),
                          new AnchorTime(),
                          new ShardCommands(),
                          new PrefixCommand(),
                          new AnchorEmbed(),
+                         new WebHookAnchor(),
                          new AdminCommands(),
                          new AdvancedPoll(),
                          new SlowAnchor(),
@@ -84,13 +87,11 @@ public class Main {
                          new HelpNew(),
                          new GetStickCommand()
                  )
-                 .disableCache(CacheFlag.ACTIVITY, CacheFlag.VOICE_STATE, CacheFlag.EMOTE, CacheFlag.CLIENT_STATUS)
+                 .disableCache(CacheFlag.ACTIVITY, CacheFlag.VOICE_STATE, CacheFlag.EMOJI, CacheFlag.CLIENT_STATUS, CacheFlag.ONLINE_STATUS)
                 .build();
 
         jda.setActivity(playing("?help"));
-        if (!jda.getShards().isEmpty()) {
-            jda.getShards().get(0).upsertCommand("help", "Show AnchorBot commands.").queue();
-        }
+        registerSlashCommands();
 
         if (!topggAPIToken.isBlank() && !botId.equals("YOUR_BOT_ID")) {
             topggAPI = new DiscordBotListAPI.Builder()
@@ -110,6 +111,12 @@ public class Main {
 
     public static boolean isOwner(long userId) {
         return ownerIds.contains(userId);
+    }
+
+    private static void registerSlashCommands() {
+        if (!jda.getShards().isEmpty()) {
+            jda.getShards().get(0).updateCommands().addCommands(SlashCommandHandler.commandData()).queue();
+        }
     }
 
     private static Set<Long> parseOwnerIds(String rawValue) {

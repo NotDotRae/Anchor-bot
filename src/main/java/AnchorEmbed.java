@@ -1,7 +1,7 @@
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.awt.*;
@@ -11,11 +11,14 @@ import java.util.List;
 
 public class AnchorEmbed extends ListenerAdapter {
 
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
 
         String[] args = event.getMessage().getContentRaw().split("\\s+");
-        //Member stickyBot = event.getGuild().getMemberById(Main.botId);
-        Guild stickyServer = Main.jda.getGuildById("0");
+        //Member anchorBot = event.getGuild().getMemberById(Main.botId);
         String channelId = event.getChannel().getId();
 
         String prefix = "?";
@@ -34,7 +37,7 @@ public class AnchorEmbed extends ListenerAdapter {
                 EmbedBuilder em = new EmbedBuilder();
                 em.setTitle("**Whoops! This is an AnchorBot Command!** ")
                         .addField("__AnchorBot__ allows for pin embeds plus other features.", "This command is available to all servers.", false);
-                event.getMessage().reply(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
             } else {
 
                 if (args.length == 2) {
@@ -52,7 +55,7 @@ public class AnchorEmbed extends ListenerAdapter {
 
         } else if (args[0].equalsIgnoreCase(prefix + "setimage") && (!permCheck(event.getMember()))) {
         //Adds X emote
-        event.getMessage().addReaction("\u274C").queue();
+        BotUtil.react(event.getMessage(), "❌");
             event.getMessage().reply(event.getMember().getAsMention() + " you need the `Manage Messages` permission to use this command!").queue();
     }
 
@@ -63,7 +66,7 @@ public class AnchorEmbed extends ListenerAdapter {
                 EmbedBuilder em = new EmbedBuilder();
                 em.setTitle("**Whoops! This is an AnchorBot Command!** ")
                         .addField("__AnchorBot__ allows for pin embeds plus other features.", "This command is available to all servers.", false);
-                event.getMessage().reply(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
             } else {
                 removeDBimage(channelId);
                 Main.mapImageLinkEmbed.remove(channelId);
@@ -72,7 +75,7 @@ public class AnchorEmbed extends ListenerAdapter {
 
         } else if (args[0].equalsIgnoreCase(prefix + "removeimage") && (!permCheck(event.getMember()))) {
         //Adds X emote
-        event.getMessage().addReaction("\u274C").queue();
+        BotUtil.react(event.getMessage(), "❌");
             event.getMessage().reply(event.getMember().getAsMention() + " you need the `Manage Messages` permission to use this command!").queue();
         }
 
@@ -92,7 +95,7 @@ public class AnchorEmbed extends ListenerAdapter {
                     em.addField("Big Image Link: ", "[here](" + Main.mapBigImageLinkEmbed.get(channelId) + ")" , true);
                 }
 
-                event.getMessage().replyEmbeds(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
 
             } else {
                 event.getMessage().reply(event.getMember().getAsMention() + " there is no image currently set for pin embeds in this channel.\nSet one with the `" + prefix + "setimage` command.").queue();
@@ -110,7 +113,7 @@ public class AnchorEmbed extends ListenerAdapter {
                 EmbedBuilder em = new EmbedBuilder();
                 em.setTitle("**Whoops! This is an AnchorBot Command!** ")
                         .addField("__AnchorBot__ allows for pin embeds plus other features.", "This command is available to all servers.", false);
-                event.getMessage().replyEmbeds(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
             } else {
 
                 if (args.length == 2) {
@@ -128,7 +131,7 @@ public class AnchorEmbed extends ListenerAdapter {
 
         } else if (args[0].equalsIgnoreCase(prefix + "setbigimage") && (!permCheck(event.getMember()))) {
             //Adds X emote
-            event.getMessage().addReaction("\u274C").queue();
+            BotUtil.react(event.getMessage(), "❌");
             event.getMessage().reply(event.getMember().getAsMention() + " you need the `Manage Messages` permission to use this command!").queue();
         }
 
@@ -139,7 +142,7 @@ public class AnchorEmbed extends ListenerAdapter {
                 EmbedBuilder em = new EmbedBuilder();
                 em.setTitle("**Whoops! This is an AnchorBot Command!** ")
                         .addField("__AnchorBot__ allows for pin embeds plus other features.", "This command is available to all servers.", false);
-                event.getMessage().replyEmbeds(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
             } else {
                 removeDBBigImage(channelId);
                 Main.mapBigImageLinkEmbed.remove(channelId);
@@ -148,19 +151,19 @@ public class AnchorEmbed extends ListenerAdapter {
 
         } else if (args[0].equalsIgnoreCase(prefix + "removebigimage") && (!permCheck(event.getMember()))) {
             //Adds X emote
-            event.getMessage().addReaction("\u274C").queue();
+            BotUtil.react(event.getMessage(), "❌");
             event.getMessage().reply(event.getMember().getAsMention() + " you need the `Manage Messages` permission to use this command!").queue();
         }
 
 
         if (args[0].equalsIgnoreCase(prefix + "getbigimage") && (permCheck(event.getMember())) && !event.getAuthor().isBot()) {
 
-            if (Main.mapImageLinkEmbed.containsKey(channelId)) {
+            if (Main.mapBigImageLinkEmbed.containsKey(channelId)) {
                 EmbedBuilder em = new EmbedBuilder();
                 em.setTitle("Current big image for pin embeds in this channel:");
                 em.setThumbnail(Main.mapBigImageLinkEmbed.get(channelId));
                 em.setDescription("Link: " + Main.mapBigImageLinkEmbed.get(channelId));
-                event.getMessage().replyEmbeds(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
 
             } else {
                 event.getMessage().reply(event.getMember().getAsMention() + " there is no image currently set for pin embeds in this channel.\nSet one with the `" + prefix + "setimage` command.").queue();
@@ -177,18 +180,10 @@ public class AnchorEmbed extends ListenerAdapter {
                 EmbedBuilder em = new EmbedBuilder();
                 em.setTitle("**Whoops! This is an AnchorBot Command!** ")
                         .addField("__AnchorBot__ allows for pin embeds plus other features.", "This command is available to all servers.", false);
-                event.getMessage().replyEmbeds(em.setColor(Color.ORANGE).build()).queue();
+                event.getMessage().replyEmbeds(em.setColor(BotStyle.PRIMARY).build()).queue();
             }
             else  {
                 try {
-
-                    for (Emote emote : event.getMessage().getEmotes()) {
-                        event.getGuild().retrieveEmoteById(emote.getId()).queue(success -> {}, failure -> {
-                            event.getMessage().reply(event.getMember().getAsMention() + " Error: Please only use emotes that are from this server.").queue();
-                            Main.mapMessageEmbed.remove(event.getChannel().getId());
-                            removeDB(channelId);
-                        });
-                    }
 
                     if (event.getMessage().getContentRaw().contains(prefix + "stickembed \n")) {
                         event.getMessage().reply(event.getMember().getAsMention() + " Error: Please provide text after `" + prefix + "stickembed` before using a new line.").queue();
@@ -198,10 +193,10 @@ public class AnchorEmbed extends ListenerAdapter {
                     String o = event.getMessage().getContentRaw();
                     String [] arr = o.split(" ", 2);
 
-                    String message = arr[1];
+                    String message = BotUtil.stripCustomEmoji(arr[1]);
 
                     if(Character.isWhitespace(message.charAt(0))) {
-                        message.replaceFirst("\\s+", "");
+                        message = message.replaceFirst("^\\s+", "");
                     }
 
 
@@ -219,17 +214,17 @@ public class AnchorEmbed extends ListenerAdapter {
                         emb.setImage(Main.mapBigImageLinkEmbed.get(channelId));
                     }
 
-                    emb.setColor(event.getGuild().getMemberById(Main.botId).getColor());
+                    emb.setColor(BotStyle.PRIMARY);
                     SilentMessages.send(event.getChannel(), emb.build()).queue(m -> Main.mapDeleteIdEmbed.put(event.getChannel().getId(), m.getId()));
-                    event.getMessage().addReaction("\u2705").queue();
+                    BotUtil.react(event.getMessage(), "✅");
                 } catch (Exception e) {
-                    event.getMessage().reply(event.getMember().getAsMention() + " please use this format: `" + prefix + "stickembed <message>`\n*Only include emotes that are from this server.*").queue();
+                    event.getMessage().reply(event.getMember().getAsMention() + " please use this format: `" + prefix + "stickembed <message>`.").queue();
                 }
             }
 
         } else if (args[0].equalsIgnoreCase(prefix + "stickembed") && (!permCheck(event.getMember()))) {
             //Adds X emote
-            event.getMessage().addReaction("\u274C").queue();
+            BotUtil.react(event.getMessage(), "❌");
             //event.getChannel().sendMessage("You need the `Manage Messages` permission to use this command!").queue();
         }
 
@@ -241,10 +236,10 @@ public class AnchorEmbed extends ListenerAdapter {
             }
 
             removeDB(channelId);
-            event.getMessage().addReaction("\u2705").queue();
-        } else if ( (args[0].equalsIgnoreCase(Main.prefix + "stickstop") || args[0].equalsIgnoreCase(Main.prefix + "unstick")) && (!permCheck(event.getMember() ))) {
+            BotUtil.react(event.getMessage(), "✅");
+        } else if ( (args[0].equalsIgnoreCase(prefix + "stickstop") || args[0].equalsIgnoreCase(prefix + "unstick")) && (!permCheck(event.getMember() ))) {
             //Adds X mark
-            event.getMessage().addReaction("\u274C").queue();
+            BotUtil.react(event.getMessage(), "❌");
             //event.getChannel().sendMessage("You need the global `Manage Messages` permission to use this command!").queue();
         }
 
@@ -252,7 +247,7 @@ public class AnchorEmbed extends ListenerAdapter {
             event.getChannel().getHistory().retrievePast(5).queue(history -> {
 
                 for(Message m : history) {
-                    //if message is sticky message
+                    //if message is pin message
                     if(!m.getEmbeds().isEmpty() && embedCheck(m, channelId)) {
                         //if message is older then 30 sec
                         if(m.getTimeCreated().compareTo(OffsetDateTime.now().minusSeconds(15)) < 0) {
@@ -260,7 +255,7 @@ public class AnchorEmbed extends ListenerAdapter {
 
                             EmbedBuilder emb = new EmbedBuilder();
                             emb.setDescription(Main.mapMessageEmbed.get(channelId));
-                            emb.setColor(event.getGuild().getMemberById(Main.botId).getColor());
+                            emb.setColor(BotStyle.PRIMARY);
                             if (Main.mapImageLinkEmbed.containsKey(channelId)) {
                                 emb.setThumbnail(Main.mapImageLinkEmbed.get(channelId));
                             }
@@ -269,7 +264,7 @@ public class AnchorEmbed extends ListenerAdapter {
                             }
                             SilentMessages.send(event.getChannel(), emb.build()).queue(mes -> Main.mapDeleteIdEmbed.put(channelId, mes.getId()));
 
-                            //Added to make sure it does not bug and send two stickies (next 5 lines)
+                            //Added to make sure it does not bug and send two pins (next 5 lines)
                             event.getChannel().getHistory().retrievePast(10).queue(messageListDelete -> {
 
                             for (Message mess : messageListDelete.subList(1, 10)) {
@@ -283,7 +278,7 @@ public class AnchorEmbed extends ListenerAdapter {
                     }
                 }
 
-                //gets set to true if one of last five messages contains sticky message.
+                //gets set to true if one of last five messages contains pin message.
                 Boolean check = false;
 
                 for(Message m : history) {
@@ -298,8 +293,8 @@ public class AnchorEmbed extends ListenerAdapter {
 
                     event.getChannel().getHistory().retrievePast(6).queue(history2 -> {
                         for(Message m : history2) {
-                            //if message is sticky message
-                            if(!m.getEmbeds().isEmpty() && m.getEmbeds().get(0).getDescription().equals(Main.mapMessageEmbed.get(channelId))) {
+                            //if message is pin message
+                            if(!m.getEmbeds().isEmpty() && embedCheck(m, channelId)) {
                                 m.delete().queue(null, (error) -> {});
                             }
                         }
@@ -313,7 +308,7 @@ public class AnchorEmbed extends ListenerAdapter {
                     if (Main.mapBigImageLinkEmbed.containsKey(channelId)) {
                         emb.setImage(Main.mapBigImageLinkEmbed.get(channelId));
                     }
-                    emb.setColor(event.getGuild().getMemberById(Main.botId).getColor());
+                    emb.setColor(BotStyle.PRIMARY);
 
                     try {
                         SilentMessages.send(event.getChannel(), emb.build()).queue(null, (error) -> {
@@ -321,7 +316,7 @@ public class AnchorEmbed extends ListenerAdapter {
                             Main.mapMessageEmbed.remove(channelId);
                             Main.mapDeleteId.remove(channelId);
                             removeDB(channelId);
-                            System.out.println("Tried to send sticky message in channel with no MESSAGE_WRITE perms. Sticky message has been stopped:");
+                            System.out.println("Tried to send pin message in channel with no MESSAGE_WRITE perms. Pin message has been stopped:");
                             System.out.println("Channel ID: " + channelId + "\nServer ID: " + event.getGuild().getId());
 
                         });
@@ -329,7 +324,7 @@ public class AnchorEmbed extends ListenerAdapter {
                         Main.mapMessageEmbed.remove(channelId);
                         Main.mapDeleteId.remove(channelId);
                         removeDB(channelId);
-                        System.out.println("Tried to send sticky message in channel with no MESSAGE_WRITE perms. Sticky message has been stopped:");
+                        System.out.println("Tried to send pin message in channel with no MESSAGE_WRITE perms. Pin message has been stopped:");
                         System.out.println("Channel ID: " + channelId + "\nServer ID: " + event.getGuild().getId());
                     }
                 }
@@ -346,7 +341,7 @@ public class AnchorEmbed extends ListenerAdapter {
     }
 
     public boolean embedCheck(Message mess, String channelId) {
-        //returns true if embed description is sticky message
+        //returns true if embed description is pin message
 
         try {
             if (mess.getEmbeds().get(0).getDescription().contains(Main.mapMessageEmbed.get(channelId)) ) {
@@ -387,3 +382,4 @@ public class AnchorEmbed extends ListenerAdapter {
     }
 
 }
+

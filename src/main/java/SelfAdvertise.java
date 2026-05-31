@@ -1,10 +1,14 @@
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.discordbots.api.client.DiscordBotListAPI;
 
 public class SelfAdvertise extends ListenerAdapter
 {
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (BotUtil.shouldIgnore(event)) {
+            return;
+        }
+
 
         if(event.getAuthor().isBot()) {
             return;
@@ -22,8 +26,12 @@ public class SelfAdvertise extends ListenerAdapter
 
             String userId = event.getAuthor().getId();
             api.hasVoted(userId).whenComplete((hasVoted, e) -> {
-                if(hasVoted) {
-                   event.getMessage().addReaction("⚓").queue();
+                if (e != null) {
+                    e.printStackTrace();
+                    return;
+                }
+                if(Boolean.TRUE.equals(hasVoted)) {
+                   BotUtil.react(event.getMessage(), "⚓");
                 } else {
                     event.getMessage().delete().queue();
                 }
@@ -31,3 +39,4 @@ public class SelfAdvertise extends ListenerAdapter
         }
     }
 }
+
